@@ -52,7 +52,95 @@ Ref<AudioEffectInstance> AudioEffect::instantiate() {
 	return ret;
 }
 void AudioEffect::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("process_mono", "samples"), &AudioEffect::process_mono);
+	ClassDB::bind_method(D_METHOD("process_stereo", "samples"), &AudioEffect::process_stereo);
+	ClassDB::bind_method(D_METHOD("process_mono_bytes", "samples"), &AudioEffect::process_mono_bytes);
 	GDVIRTUAL_BIND(_instantiate);
+}
+
+PackedFloat32Array AudioEffect::process_mono(const PackedFloat32Array &p_samples) {
+	int todo = p_samples.size();
+	PackedFloat32Array ret;
+	ret.resize(p_samples.size());
+
+	AudioFrame mix_buffer[MIX_BUFFER_SIZE];
+	AudioFrame temp_buffer[MIX_BUFFER_SIZE];
+	Ref<AudioEffectInstance> instance = instantiate();
+
+	while (todo) {
+		int to_mix = MIN(todo, MIX_BUFFER_SIZE);
+		for (int i = 0; i < to_mix; i++) {
+			int64_t idx = i + (p_samples.size() - todo);
+			mix_buffer[i] = Vector2(p_samples[idx], p_samples[idx]);
+		}
+
+		instance->process(mix_buffer, temp_buffer, p_samples.size());
+
+		for (int i = 0; i < to_mix; i++) {
+			int64_t idx = i + (p_samples.size() - todo);
+			ret.set(idx, temp_buffer[i].left);
+		}
+
+		todo -= to_mix;
+	}
+
+	return ret;
+}
+
+PackedVector2Array AudioEffect::process_stereo(const PackedVector2Array &p_samples) {
+	int todo = p_samples.size();
+	PackedVector2Array ret;
+	ret.resize(p_samples.size());
+
+	AudioFrame mix_buffer[MIX_BUFFER_SIZE];
+	AudioFrame temp_buffer[MIX_BUFFER_SIZE];
+	Ref<AudioEffectInstance> instance = instantiate();
+
+	while (todo) {
+		int to_mix = MIN(todo, MIX_BUFFER_SIZE);
+		for (int i = 0; i < to_mix; i++) {
+			int64_t idx = i + (p_samples.size() - todo);
+			mix_buffer[i] = AudioFrame(p_samples[idx]);
+		}
+
+		instance->process(mix_buffer, temp_buffer, p_samples.size());
+
+		for (int i = 0; i < to_mix; i++) {
+			int64_t idx = i + (p_samples.size() - todo);
+			ret.set(idx, temp_buffer[i]);
+		}
+
+		todo -= to_mix;
+	}
+
+	return ret;
+}
+
+PackedByteArray AudioEffect::process_mono_bytes(const PackedByteArray &p_samples) {
+	int todo = p_samples.size();
+	PackedByteArray ret;
+	ret.resize(p_samples.size());
+
+	Ref<AudioEffectInstance> instance = instantiate();
+
+	while (todo) {
+		int to_mix = MIN(todo, MIX_BUFFER_SIZE);
+
+		int offset = p_samples.size() - todo;
+		for (int i = 0; i < to_mix; i++) {
+			int idx = i + offset;
+			mix_buffer[i] = Vector2(p_samples[idx], p_samples[idx]) / 255.0;
+		}
+		
+		instance->process(mix_buffer, temp_buffer, to_mix);
+
+		for (int i = 0; i < to_mix; i++) {
+			ret.set(i + offset, temp_buffer[i].left * 255.0);
+		}
+
+		todo -= to_mix;
+	}
+	return ret;
 }
 
 AudioEffect::AudioEffect() {

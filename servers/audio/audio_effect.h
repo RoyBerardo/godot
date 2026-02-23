@@ -34,6 +34,7 @@
 #include "core/math/audio_frame.h"
 #include "core/object/gdvirtual.gen.inc"
 #include "core/variant/native_ptr.h"
+#include "core/variant/variant.h"
 
 class AudioEffectInstance : public RefCounted {
 	GDCLASS(AudioEffectInstance, RefCounted);
@@ -56,6 +57,19 @@ protected:
 	static void _bind_methods();
 
 public:
+	enum {
+		MIX_BUFFER_SIZE = 2048
+	};
+
 	virtual Ref<AudioEffectInstance> instantiate();
+
+	PackedFloat32Array process_mono(const PackedFloat32Array &p_samples);
+	PackedVector2Array process_stereo(const PackedVector2Array &p_samples);
+	PackedByteArray process_mono_bytes(const PackedByteArray &p_samples);
+
 	AudioEffect();
+
+private:
+	AudioFrame mix_buffer[MIX_BUFFER_SIZE];
+	AudioFrame temp_buffer[MIX_BUFFER_SIZE];
 };
